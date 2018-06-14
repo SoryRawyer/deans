@@ -35,7 +35,6 @@ fn main(){
     socket.connect("10.0.0.1:53").expect("could not connect");
     // socket.send_to(query.as_slice(), "8.8.8.8:53").expect("send_to failed");
     socket.send(query.as_slice()).expect("send failed");
-    // sshanker220@gmail.com
 }
 
 
