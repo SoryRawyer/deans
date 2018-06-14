@@ -1,0 +1,6 @@
+[package]
+name = "deans"
+version = "0.1.0"
+authors = ["soryrawyer <sory.rawyer@gmail.com>"]
+
+[dependencies]
