@@ -1,4 +1,5 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
+use std::net::{UdpSocket};
+use std::env;
 
 fn main(){
     // DNS -> port 53
@@ -6,9 +7,12 @@ fn main(){
     //   question : domain + type + class (class is "IN" for internet applications)
     // 2. parse response (header + question + answers)
 
-    let socket_dst = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)), 53);
-    let mut socket = UdpSocket::bind("0.0.0.0:34254").expect("somethign qent wrong [sic]");
+    let socket = UdpSocket::bind("0.0.0.0:34254").expect("somethign qent wrong [sic]");
 
+    //let domain: &str = env::args().collect().get(0).expect("No domain arg supplied");
+
+    let args: Vec<String> = env::args().collect();
+    let domain = args.get(1).expect("No domain supplied");
     let header = DnsHeader{
         id: u16::to_be(1025),
         query_response: false,
@@ -24,9 +28,9 @@ fn main(){
         add_rec_count: 0
     };
     let question = DnsQuestion {
-        domain: String::from("google.com"),
-        question_type: u16::to_be('A' as u16),
-        question_class: u16::to_be(18766)
+        domain: domain.to_owned(),
+        question_type: 1u16,
+        question_class: 1u16
     };
     let mut query: Vec<u8> = header.serialize().to_vec();
     let mut serialized_question = question.serialize();
@@ -35,9 +39,51 @@ fn main(){
     socket.connect("10.0.0.1:53").expect("could not connect");
     // socket.send_to(query.as_slice(), "8.8.8.8:53").expect("send_to failed");
     socket.send(query.as_slice()).expect("send failed");
+
+    let mut response_bytes: Vec<u8> = Vec::new();
+
+
+        let mut buf = [0; 1500];
+        match socket.recv(&mut buf) {
+            Ok(received) => {
+                response_bytes.extend(&buf[..received]);
+
+            }
+            Err(e) => println!("recv function failed: {:?}", e),
+        }  
+    
+    let answer_start_index: usize = 12 + question.serialize().len();
+    // println!("response bytes: {:?}", response_bytes);
+    // println!("response bytes, starting at {:?}, {:?}", answer_start_index, &response_bytes[answer_start_index..]);
+
+    println!("{}", get_ip_from_response(&response_bytes[answer_start_index..]));
+    // println!("{}", get_ip_from_response(response_bytes, answer_start_index));
+
 }
 
+fn get_ip_from_response(response_bytes: &[u8]) -> String {
+    // response will be header + question + answer RRs
+    // we know length of header and question
 
+    let rdata_length = response_bytes[11];
+    let data_type = response_bytes[3];
+
+    if data_type == 6 {
+        return String::from("SOA (not found)");
+    }
+
+    if data_type != 1 {
+        panic!("Non A-Records unsupported");
+    }
+    if rdata_length == 4 {
+        let octet_list: Vec<String> = response_bytes[12..16].iter().map(|byte| byte.to_string()).collect();
+        return octet_list.join(".");
+
+    } else {
+        panic!("Abort!")
+    }
+
+}
 
 // DNS Headers are always 12 bytes
 pub struct DnsHeader {
@@ -107,7 +153,7 @@ impl DnsQuestion {
       let mut byte_vec: Vec<u8> = Vec::new();
       let mut parsed_domain = self._parse_domain();
       byte_vec.append(&mut parsed_domain);
-
+ 
       byte_vec.push((self.question_type >> 8) as u8);
       byte_vec.push((self.question_type) as u8);
 
@@ -127,7 +173,7 @@ impl DnsQuestion {
     }
     result.push(0u8);
     result
-}
+  }
 
 }
 
